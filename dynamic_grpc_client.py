@@ -2,8 +2,41 @@ import importlib
 import sys
 import os
 from grpc_tools import protoc
+from google.protobuf import descriptor_pb2
+import subprocess
 import grpc
 import time
+
+
+def print_services_from_proto(proto_path):
+    desc_path = "tmp_descriptor.pb"
+    subprocess.run(
+        [
+            "protoc",
+            f"--proto_path={os.path.dirname(proto_path)}",
+            f"--descriptor_set_out={desc_path}",
+            "--include_imports",
+            os.path.basename(proto_path),
+        ],
+        check=True,
+    )
+
+    with open(desc_path, "rb") as f:
+        data = f.read()
+
+    file_set = descriptor_pb2.FileDescriptorSet()
+    file_set.ParseFromString(data)
+
+    for file_desc in file_set.file:
+        print(f"Proto file: {file_desc.name}")
+        for service in file_desc.service:
+            print(f" Service: {service.name}")
+            for method in service.method:
+                print(f"  RPC: {method.name}")
+                print(f"    Input: {method.input_type}")
+                print(f"    Output: {method.output_type}")
+
+    os.remove(desc_path)
 
 
 def compile_proto(proto_path, out_dir="."):
@@ -41,7 +74,6 @@ def call_rpc(
     base_name = os.path.splitext(os.path.basename(proto_path))[0]
     pb2 = dynamic_import(f"{base_name}_pb2", f"{base_name}_pb2.py")
     pb2_grpc = dynamic_import(f"{base_name}_pb2_grpc", f"{base_name}_pb2_grpc.py")
-
     channel = grpc.insecure_channel(host)
 
     stub_class = getattr(pb2_grpc, f"{service_name}Stub")
@@ -55,8 +87,8 @@ def call_rpc(
 
 if __name__ == "__main__":
     proto_file = "./proto/greeter.proto"
+    print_services_from_proto(proto_file)
     svc = "Greeter"
     rpc = "SayHello"
     val = "Hello from dynamic client"
-
     print(call_rpc(proto_file, svc, rpc, val))

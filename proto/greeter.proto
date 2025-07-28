@@ -9,3 +9,6 @@ message StringValue {
 service Greeter {
   rpc SayHello (StringValue) returns (StringValue);
 }
+service Byer {
+  rpc SayWorld (StringValue) returns (StringValue);
+}
